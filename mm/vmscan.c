@@ -2368,14 +2368,12 @@ static unsigned long do_try_to_free_pages(struct zonelist *zonelist,
 	struct zone *zone;
 	unsigned long writeback_threshold;
 	bool aborted_reclaim;
-	int min_scan_priority = 1;
 
 	delayacct_freepages_start();
 
 	if (global_reclaim(sc))
 		count_vm_event(ALLOCSTALL);
 
-rescan:
 	do {
 		vmpressure_prio(sc->gfp_mask, sc->target_mem_cgroup,
 				sc->priority);
@@ -2430,7 +2428,7 @@ rescan:
 						WB_REASON_TRY_TO_FREE_PAGES);
 			sc->may_writepage = 1;
 		}
-	} while (--sc->priority >= min_scan_priority);
+	} while (--sc->priority >= 0);
 
 out:
 	delayacct_freepages_end();
@@ -2453,12 +2451,6 @@ out:
 	/* top priority shrink_zones still had more to do? don't OOM, then */
 	if (global_reclaim(sc) && !all_unreclaimable(zonelist, sc))
 		return 1;
-
-	/* If the page allocator is considering OOM, rescan at priority 0 */
-	if (min_scan_priority) {
-		min_scan_priority = 0;
-		goto rescan;
-	}
 
 	return 0;
 }
