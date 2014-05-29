@@ -98,10 +98,11 @@ struct vm_area_struct *vmacache_find(struct mm_struct *mm, unsigned long addr)
 		if (WARN_ON_ONCE(vma->vm_mm != mm))
 			break;
 
-		if (vma->vm_start <= addr && vma->vm_end > addr)
+		if (vma->vm_start <= addr && vma->vm_end > addr) {
 			BUG_ON(vma->vm_mm != mm);
 			count_vm_vmacache_event(VMACACHE_FIND_HITS);
 			return vma;
+		}
 	}
 
 	return NULL;
