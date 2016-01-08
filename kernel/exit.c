@@ -434,6 +434,8 @@ static void exit_mm(struct task_struct *tsk)
 	enter_lazy_tlb(mm, current);
 	task_unlock(tsk);
 	mm_update_next_owner(mm);
+	if (test_thread_flag(TIF_MEMDIE))
+		schedule_timeout_idle(2*HZ);
 	mmput(mm);
 	if (test_thread_flag(TIF_MEMDIE))
 		exit_oom_victim(tsk);

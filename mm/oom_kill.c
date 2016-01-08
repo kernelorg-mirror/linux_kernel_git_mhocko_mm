@@ -411,6 +411,7 @@ static DECLARE_WAIT_QUEUE_HEAD(oom_victims_wait);
 
 bool oom_killer_disabled __read_mostly;
 
+#define K(x) ((x) << (PAGE_SHIFT-10))
 #ifdef CONFIG_MMU
 /*
  * OOM Reaper kernel thread which tries to reap the memory used by the OOM
@@ -454,6 +455,7 @@ static bool __oom_reap_task(struct task_struct *tsk)
 		goto out;
 	}
 
+	pr_info("oom_reaper: Reaping mm: %p\n", mm);
 	tlb_gather_mmu(&tlb, mm, 0, -1);
 	for (vma = mm->mmap ; vma; vma = vma->vm_next) {
 		if (is_vm_hugetlb_page(vma))
@@ -493,6 +495,11 @@ static bool __oom_reap_task(struct task_struct *tsk)
 	 */
 	tsk->signal->oom_score_adj = OOM_SCORE_ADJ_MIN;
 	exit_oom_victim(tsk);
+	pr_info("oom_reaper: Done with pid:%d anon-rss:%lu file-rss:%lu shmem-rss:%lu\n",
+			tsk->pid,
+			K(get_mm_counter(mm, MM_ANONPAGES)),
+			K(get_mm_counter(mm, MM_FILEPAGES)),
+			K(get_mm_counter(mm, MM_SHMEMPAGES)));
 out:
 	mmput(mm);
 	return ret;
@@ -503,9 +510,12 @@ static void oom_reap_task(struct task_struct *tsk)
 {
 	int attempts = 0;
 
+	pr_info("oom_reaper. Trying to reap pid: %d\n", tsk->pid);
 	/* Retry the down_read_trylock(mmap_sem) a few times */
-	while (attempts++ < MAX_OOM_REAP_RETRIES && !__oom_reap_task(tsk))
+	while (attempts++ < MAX_OOM_REAP_RETRIES && !__oom_reap_task(tsk)) {
+		pr_info("Retrying __oom_reap_task attempt:%d tsk:%d %s\n", attempts, tsk->pid, tsk->comm);
 		schedule_timeout_idle(HZ/10);
+	}
 
 	if (attempts > MAX_OOM_REAP_RETRIES) {
 		pr_info("oom_reaper: unable to reap pid:%d (%s)\n",
@@ -546,9 +556,10 @@ static void wake_oom_reaper(struct task_struct *tsk)
 	 * disruptive so better reduce it to the bare minimum.
 	 */
 	old_tsk = cmpxchg(&task_to_reap, NULL, tsk);
-	if (!old_tsk)
+	if (!old_tsk) {
+		pr_info("Waking up oom_reaper for task pid:%d mm:%p\n", tsk->pid, tsk->mm);
 		wake_up(&oom_reaper_wait);
-	else
+	} else
 		put_task_struct(tsk);
 }
 
