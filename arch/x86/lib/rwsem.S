@@ -57,7 +57,6 @@
  * is also the input argument to these helpers)
  *
  * The following can clobber %rdx because the asm clobbers it:
- *   call_rwsem_down_write_failed
  *   call_rwsem_wake
  * but %rdi, %rsi, %rcx, %r8-r11 always need saving.
  */
@@ -92,14 +91,6 @@ ENTRY(call_rwsem_down_read_failed)
 	restore_common_regs
 	ret
 ENDPROC(call_rwsem_down_read_failed)
-
-ENTRY(call_rwsem_down_write_failed)
-	save_common_regs
-	movq %rax,%rdi
-	call rwsem_down_write_failed
-	restore_common_regs
-	ret
-ENDPROC(call_rwsem_down_write_failed)
 
 ENTRY(call_rwsem_wake)
 	/* do nothing if still outstanding active readers */
