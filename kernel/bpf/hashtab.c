@@ -320,14 +320,9 @@ static struct bpf_map *htab_map_alloc(union bpf_attr *attr)
 		goto free_htab;
 
 	err = -ENOMEM;
-	htab->buckets = kmalloc_array(htab->n_buckets, sizeof(struct bucket),
-				      GFP_USER | __GFP_NOWARN);
-
-	if (!htab->buckets) {
-		htab->buckets = vmalloc(htab->n_buckets * sizeof(struct bucket));
-		if (!htab->buckets)
-			goto free_htab;
-	}
+	htab->buckets = kvmalloc(htab->n_buckets * sizeof(struct bucket), GFP_USER);
+	if (!htab->buckets)
+		goto free_htab;
 
 	for (i = 0; i < htab->n_buckets; i++) {
 		INIT_HLIST_HEAD(&htab->buckets[i].head);
