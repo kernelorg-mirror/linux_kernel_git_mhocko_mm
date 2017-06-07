@@ -42,6 +42,8 @@
  * void nodes_shift_left(dst, src, n)	Shift left
  *
  * int first_node(mask)			Number lowest set bit, or MAX_NUMNODES
+ * int first_node_from(nid, mask)	First node starting from nid, or wrap
+ * 					from first or MAX_NUMNODES
  * int next_node(node, mask)		Next node past 'node', or MAX_NUMNODES
  * int next_node_in(node, mask)		Next node past 'node', or wrap to first,
  *					or MAX_NUMNODES
@@ -268,6 +270,15 @@ static inline int __next_node(int n, const nodemask_t *srcp)
 #define next_node_in(n, src) __next_node_in((n), &(src))
 int __next_node_in(int node, const nodemask_t *srcp);
 
+#define first_node_from(nid, mask) __first_node_from(nid, &(mask))
+static inline int __first_node_from(int nid, const nodemask_t *mask)
+{
+	if (test_bit(nid, mask->bits))
+		return nid;
+
+	return __next_node_in(nid, mask);
+}
+
 static inline void init_nodemask_of_node(nodemask_t *mask, int node)
 {
 	nodes_clear(*mask);
@@ -369,10 +380,19 @@ static inline void __nodes_fold(nodemask_t *dstp, const nodemask_t *origp,
 	for ((node) = first_node(mask);			\
 		(node) < MAX_NUMNODES;			\
 		(node) = next_node((node), (mask)))
+
+#define for_each_node_mask_preferred(node, iter, preferred, mask)	\
+	for ((node) = first_node_from((preferred), (mask)), iter = 0;	\
+		(iter) < nodes_weight((mask));				\
+		(node) = next_node_in((node), (mask)), (iter)++)
+
 #else /* MAX_NUMNODES == 1 */
 #define for_each_node_mask(node, mask)			\
 	if (!nodes_empty(mask))				\
 		for ((node) = 0; (node) < 1; (node)++)
+
+#define for_each_node_mask_preferred(node, iter, preferred, mask) \
+	for_each_node_mask(node, mask)
 #endif /* MAX_NUMNODES */
 
 /*

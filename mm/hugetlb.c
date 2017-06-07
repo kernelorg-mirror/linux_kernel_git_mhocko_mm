@@ -1723,14 +1723,17 @@ struct page *alloc_huge_page_node(struct hstate *h, int nid)
 	return page;
 }
 
-struct page *alloc_huge_page_nodemask(struct hstate *h, const nodemask_t *nmask)
+struct page *alloc_huge_page_nodemask(struct hstate *h, int preferred_nid,
+		const nodemask_t *nmask)
 {
 	struct page *page = NULL;
+	int iter;
 	int node;
 
 	spin_lock(&hugetlb_lock);
 	if (h->free_huge_pages - h->resv_huge_pages > 0) {
-		for_each_node_mask(node, *nmask) {
+		/* It would be nicer to iterate in the node distance order */
+		for_each_node_mask_preferred(node, iter, preferred_nid, *nmask) {
 			page = dequeue_huge_page_node_exact(h, node);
 			if (page)
 				break;
@@ -1741,7 +1744,7 @@ struct page *alloc_huge_page_nodemask(struct hstate *h, const nodemask_t *nmask)
 		return page;
 
 	/* No reservations, try to overcommit */
-	for_each_node_mask(node, *nmask) {
+	for_each_node_mask_preferred(node, iter, preferred_nid, *nmask) {
 		page = __alloc_buddy_huge_page_no_mpol(h, node);
 		if (page)
 			return page;
