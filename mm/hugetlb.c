@@ -902,7 +902,6 @@ static struct page *dequeue_huge_page_nodemask(struct hstate *h, gfp_t gfp_mask,
 {
 	unsigned int cpuset_mems_cookie;
 	struct zonelist *zonelist;
-	struct page *page = NULL;
 	struct zone *zone;
 	struct zoneref *z;
 	int node = -1;
@@ -912,6 +911,8 @@ static struct page *dequeue_huge_page_nodemask(struct hstate *h, gfp_t gfp_mask,
 retry_cpuset:
 	cpuset_mems_cookie = read_mems_allowed_begin();
 	for_each_zone_zonelist_nodemask(zone, z, zonelist, gfp_zone(gfp_mask), nmask) {
+		struct page *page;
+
 		if (!cpuset_zone_allowed(zone, gfp_mask))
 			continue;
 		/*
@@ -924,9 +925,9 @@ retry_cpuset:
 
 		page = dequeue_huge_page_node_exact(h, node);
 		if (page)
-			break;
+			return page;
 	}
-	if (unlikely(!page && read_mems_allowed_retry(cpuset_mems_cookie)))
+	if (unlikely(read_mems_allowed_retry(cpuset_mems_cookie)))
 		goto retry_cpuset;
 
 	return NULL;
@@ -1655,18 +1656,18 @@ struct page *alloc_huge_page_nodemask(struct hstate *h, int preferred_nid,
 		nodemask_t *nmask)
 {
 	gfp_t gfp_mask = htlb_alloc_mask(h);
-	struct page *page = NULL;
 
 	spin_lock(&hugetlb_lock);
 	if (h->free_huge_pages - h->resv_huge_pages > 0) {
+		struct page *page;
+
 		page = dequeue_huge_page_nodemask(h, gfp_mask, preferred_nid, nmask);
-		if (page)
-			goto unlock;
+		if (page) {
+			spin_unlock(&hugetlb_lock);
+			return page;
+		}
 	}
-unlock:
 	spin_unlock(&hugetlb_lock);
-	if (page)
-		return page;
 
 	/* No reservations, try to overcommit */
 
