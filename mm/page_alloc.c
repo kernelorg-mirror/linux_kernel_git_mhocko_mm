@@ -4913,17 +4913,20 @@ static int find_next_best_node(int node, nodemask_t *used_node_mask)
  * This results in maximum locality--normal zone overflows into local
  * DMA zone, if any--but risks exhausting DMA zone.
  */
-static void build_zonelists_in_node_order(pg_data_t *pgdat, int node)
+static void build_zonelists_in_node_order(pg_data_t *pgdat, int *node_order)
 {
-	int j;
 	struct zonelist *zonelist;
+	int i, zoneref_idx = 0;
 
 	zonelist = &pgdat->node_zonelists[ZONELIST_FALLBACK];
-	for (j = 0; zonelist->_zonerefs[j].zone != NULL; j++)
-		;
-	j = build_zonelists_node(NODE_DATA(node), zonelist, j);
-	zonelist->_zonerefs[j].zone = NULL;
-	zonelist->_zonerefs[j].zone_idx = 0;
+
+	for (i = 0; i < MAX_NUMNODES; i++) {
+		pg_data_t *node = NODE_DATA(node_order[i]);
+
+		zoneref_idx = build_zonelists_node(node, zonelist, zoneref_idx);
+	}
+	zonelist->_zonerefs[zoneref_idx].zone = NULL;
+	zonelist->_zonerefs[zoneref_idx].zone_idx = 0;
 }
 
 /*
@@ -4931,13 +4934,13 @@ static void build_zonelists_in_node_order(pg_data_t *pgdat, int node)
  */
 static void build_thisnode_zonelists(pg_data_t *pgdat)
 {
-	int j;
 	struct zonelist *zonelist;
+	int zoneref_idx = 0;
 
 	zonelist = &pgdat->node_zonelists[ZONELIST_NOFALLBACK];
-	j = build_zonelists_node(pgdat, zonelist, 0);
-	zonelist->_zonerefs[j].zone = NULL;
-	zonelist->_zonerefs[j].zone_idx = 0;
+	zoneref_idx = build_zonelists_node(pgdat, zonelist, zoneref_idx);
+	zonelist->_zonerefs[zoneref_idx].zone = NULL;
+	zonelist->_zonerefs[zoneref_idx].zone_idx = 0;
 }
 
 /*
@@ -4946,21 +4949,13 @@ static void build_thisnode_zonelists(pg_data_t *pgdat)
  * exhausted, but results in overflowing to remote node while memory
  * may still exist in local DMA zone.
  */
-static int node_order[MAX_NUMNODES];
 
 static void build_zonelists(pg_data_t *pgdat)
 {
-	int i, node, load;
+	static int node_order[MAX_NUMNODES];
+	int node, load, i = 0;
 	nodemask_t used_mask;
 	int local_node, prev_node;
-	struct zonelist *zonelist;
-
-	/* initialize zonelists */
-	for (i = 0; i < MAX_ZONELISTS; i++) {
-		zonelist = pgdat->node_zonelists + i;
-		zonelist->_zonerefs[0].zone = NULL;
-		zonelist->_zonerefs[0].zone_idx = 0;
-	}
 
 	/* NUMA-aware ordering of nodes */
 	local_node = pgdat->node_id;
@@ -4969,8 +4964,6 @@ static void build_zonelists(pg_data_t *pgdat)
 	nodes_clear(used_mask);
 
 	memset(node_order, 0, sizeof(node_order));
-	i = 0;
-
 	while ((node = find_next_best_node(local_node, &used_mask)) >= 0) {
 		/*
 		 * We don't want to pressure a particular node.
@@ -4981,11 +4974,12 @@ static void build_zonelists(pg_data_t *pgdat)
 		    node_distance(local_node, prev_node))
 			node_load[node] = load;
 
+		node_order[i++] = node;
 		prev_node = node;
 		load--;
-		build_zonelists_in_node_order(pgdat, node);
 	}
 
+	build_zonelists_in_node_order(pgdat, node_order);
 	build_thisnode_zonelists(pgdat);
 }
 
