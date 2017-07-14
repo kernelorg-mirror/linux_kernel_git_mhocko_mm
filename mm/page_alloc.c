@@ -4828,8 +4828,8 @@ int numa_zonelist_order_handler(struct ctl_table *table, int write,
 	int ret;
 
 	if (!write) {
-		int len = sizeof("Default");
-		if (copy_to_user(buffer, "Default", len))
+		int len = sizeof("Node");
+		if (copy_to_user(buffer, "Node", len))
 			return -EFAULT;
 		return len;
 	}
