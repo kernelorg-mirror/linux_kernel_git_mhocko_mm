@@ -2544,8 +2544,8 @@ unsigned long _PAGE_CACHE __read_mostly;
 EXPORT_SYMBOL(_PAGE_CACHE);
 
 #ifdef CONFIG_SPARSEMEM_VMEMMAP
-int __meminit vmemmap_populate(unsigned long vstart, unsigned long vend,
-			       int node)
+int __meminit __vmemmap_populate(unsigned long vstart, unsigned long vend,
+			       int node, struct vmem_altmap *altmap)
 {
 	unsigned long pte_base;
 
@@ -2587,7 +2587,7 @@ int __meminit vmemmap_populate(unsigned long vstart, unsigned long vend,
 
 		pte = pmd_val(*pmd);
 		if (!(pte & _PAGE_VALID)) {
-			void *block = vmemmap_alloc_block(PMD_SIZE, node);
+			void *block = __vmemmap_alloc_block_buf(PMD_SIZE, node, altmap);
 
 			if (!block)
 				return -ENOMEM;

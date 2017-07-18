@@ -208,7 +208,8 @@ static void vmem_remove_range(unsigned long start, unsigned long size)
 /*
  * Add a backed mem_map array to the virtual mem_map array.
  */
-int __meminit vmemmap_populate(unsigned long start, unsigned long end, int node)
+int __meminit __vmemmap_populate(unsigned long start, unsigned long end, int node,
+		struct vmem_altmap *altmap)
 {
 	unsigned long pgt_prot, sgt_prot;
 	unsigned long address = start;
@@ -247,12 +248,12 @@ int __meminit vmemmap_populate(unsigned long start, unsigned long end, int node)
 			 * use large frames even if they are only partially
 			 * used.
 			 * Otherwise we would have also page tables since
-			 * vmemmap_populate gets called for each section
+			 * __vmemmap_populate gets called for each section
 			 * separately. */
 			if (MACHINE_HAS_EDAT1) {
 				void *new_page;
 
-				new_page = vmemmap_alloc_block(PMD_SIZE, node);
+				new_page = __vmemmap_alloc_block_buf(PMD_SIZE, node, altmap);
 				if (!new_page)
 					goto out;
 				pmd_val(*pm_dir) = __pa(new_page) | sgt_prot;

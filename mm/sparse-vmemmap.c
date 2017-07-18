@@ -14,7 +14,7 @@
  * case the overhead consists of a few additional pages that are
  * allocated to create a view of memory for vmemmap.
  *
- * The architecture is expected to provide a vmemmap_populate() function
+ * The architecture is expected to provide a __vmemmap_populate() function
  * to instantiate the mapping.
  */
 #include <linux/mm.h>

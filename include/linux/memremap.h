@@ -8,12 +8,12 @@ struct resource;
 struct device;
 
 /**
- * struct vmem_altmap - pre-allocated storage for vmemmap_populate
+ * struct vmem_altmap - pre-allocated storage for __vmemmap_populate
  * @base_pfn: base of the entire dev_pagemap mapping
  * @reserve: pages mapped, but reserved for driver use (relative to @base)
  * @free: free pages set aside in the mapping for memmap storage
  * @align: pages reserved to meet allocation alignments
- * @alloc: track pages consumed, private to vmemmap_populate()
+ * @alloc: track pages consumed, private to __vmemmap_populate()
  */
 struct vmem_altmap {
 	const unsigned long base_pfn;
@@ -25,15 +25,6 @@ struct vmem_altmap {
 
 unsigned long vmem_altmap_offset(struct vmem_altmap *altmap);
 void vmem_altmap_free(struct vmem_altmap *altmap, unsigned long nr_pfns);
-
-#ifdef CONFIG_ZONE_DEVICE
-struct vmem_altmap *to_vmem_altmap(unsigned long memmap_start);
-#else
-static inline struct vmem_altmap *to_vmem_altmap(unsigned long memmap_start)
-{
-	return NULL;
-}
-#endif
 
 /**
  * struct dev_pagemap - metadata for ZONE_DEVICE mappings

@@ -44,6 +44,7 @@
 #include <linux/slab.h>
 #include <linux/of_fdt.h>
 #include <linux/libfdt.h>
+#include <linux/memremap.h>
 
 #include <asm/pgalloc.h>
 #include <asm/page.h>
@@ -115,7 +116,8 @@ static struct vmemmap_backing *next;
 static int num_left;
 static int num_freed;
 
-static __meminit struct vmemmap_backing * vmemmap_list_alloc(int node)
+static __meminit struct vmemmap_backing * vmemmap_list_alloc(int node,
+		struct vmem_altmap *altmap)
 {
 	struct vmemmap_backing *vmem_back;
 	/* get from freed entries first */
@@ -129,7 +131,7 @@ static __meminit struct vmemmap_backing * vmemmap_list_alloc(int node)
 
 	/* allocate a page when required and hand out chunks */
 	if (!num_left) {
-		next = vmemmap_alloc_block(PAGE_SIZE, node);
+		next = __vmemmap_alloc_block_buf(PAGE_SIZE, node, altmap);
 		if (unlikely(!next)) {
 			WARN_ON(1);
 			return NULL;
@@ -144,11 +146,12 @@ static __meminit struct vmemmap_backing * vmemmap_list_alloc(int node)
 
 static __meminit void vmemmap_list_populate(unsigned long phys,
 					    unsigned long start,
-					    int node)
+					    int node,
+					    struct vmem_altmap *altmap)
 {
 	struct vmemmap_backing *vmem_back;
 
-	vmem_back = vmemmap_list_alloc(node);
+	vmem_back = vmemmap_list_alloc(node, altmap);
 	if (unlikely(!vmem_back)) {
 		WARN_ON(1);
 		return;
@@ -161,14 +164,15 @@ static __meminit void vmemmap_list_populate(unsigned long phys,
 	vmemmap_list = vmem_back;
 }
 
-int __meminit vmemmap_populate(unsigned long start, unsigned long end, int node)
+int __meminit __vmemmap_populate(unsigned long start, unsigned long end, int node,
+		struct vmem_altmap *altmap)
 {
 	unsigned long page_size = 1 << mmu_psize_defs[mmu_vmemmap_psize].shift;
 
 	/* Align to the page size of the linear mapping. */
 	start = _ALIGN_DOWN(start, page_size);
 
-	pr_debug("vmemmap_populate %lx..%lx, node %d\n", start, end, node);
+	pr_debug("__vmemmap_populate %lx..%lx, node %d\n", start, end, node);
 
 	for (; start < end; start += page_size) {
 		void *p;
@@ -177,11 +181,11 @@ int __meminit vmemmap_populate(unsigned long start, unsigned long end, int node)
 		if (vmemmap_populated(start, page_size))
 			continue;
 
-		p = vmemmap_alloc_block(page_size, node);
+		p = __vmemmap_alloc_block_buf(page_size, node, altmap);
 		if (!p)
 			return -ENOMEM;
 
-		vmemmap_list_populate(__pa(p), start, node);
+		vmemmap_list_populate(__pa(p), start, node, altmap);
 
 		pr_debug("      * %016lx..%016lx allocated at %p\n",
 			 start, start + page_size, p);
@@ -189,7 +193,7 @@ int __meminit vmemmap_populate(unsigned long start, unsigned long end, int node)
 		rc = vmemmap_create_mapping(start, page_size, __pa(p));
 		if (rc < 0) {
 			pr_warning(
-				"vmemmap_populate: Unable to create vmemmap mapping: %d\n",
+				"__vmemmap_populate: Unable to create vmemmap mapping: %d\n",
 				rc);
 			return -EFAULT;
 		}
@@ -253,6 +257,12 @@ void __ref vmemmap_free(unsigned long start, unsigned long end)
 		addr = vmemmap_list_free(start);
 		if (addr) {
 			struct page *page = pfn_to_page(addr >> PAGE_SHIFT);
+			struct vmem_altmap *altmap = to_vmem_altmap((unsigned long) page);
+
+			if (altmap) {
+				vmem_altmap_free(altmap, page_size >> PAGE_SHIFT);
+				goto unmap;
+			}
 
 			if (PageReserved(page)) {
 				/* allocated from bootmem */
@@ -272,6 +282,7 @@ void __ref vmemmap_free(unsigned long start, unsigned long end)
 				free_pages((unsigned long)(__va(addr)),
 							get_order(page_size));
 
+unmap:
 			vmemmap_remove_mapping(start, page_size);
 		}
 	}

@@ -2441,10 +2441,27 @@ static inline void *vmemmap_alloc_block_buf(unsigned long size, int node)
 	return __vmemmap_alloc_block_buf(size, node, NULL);
 }
 
+#ifdef CONFIG_ZONE_DEVICE
+struct vmem_altmap *to_vmem_altmap(unsigned long memmap_start);
+#else
+static inline struct vmem_altmap *to_vmem_altmap(unsigned long memmap_start)
+{
+	return NULL;
+}
+#endif
+
 void vmemmap_verify(pte_t *, int, unsigned long, unsigned long);
 int vmemmap_populate_basepages(unsigned long start, unsigned long end,
 			       int node);
-int vmemmap_populate(unsigned long start, unsigned long end, int node);
+int __vmemmap_populate(unsigned long start, unsigned long end, int node,
+		struct vmem_altmap *altmap);
+static inline int vmemmap_populate(unsigned long start, unsigned long end,
+		int node)
+{
+	struct vmem_altmap *altmap = to_vmem_altmap(start);
+	return __vmemmap_populate(start, end, node, altmap);
+}
+
 void vmemmap_populate_print_last(void);
 #ifdef CONFIG_MEMORY_HOTPLUG
 void vmemmap_free(unsigned long start, unsigned long end);
