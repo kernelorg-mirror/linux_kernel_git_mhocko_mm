@@ -2426,6 +2426,8 @@ void sparse_mem_maps_populate_node(struct page **map_map,
 				   unsigned long map_count,
 				   int nodeid);
 
+struct page *__sparse_mem_map_populate(unsigned long pnum, int nid,
+		struct vmem_altmap *altmap);
 struct page *sparse_mem_map_populate(unsigned long pnum, int nid);
 pgd_t *vmemmap_pgd_populate(unsigned long addr, int node);
 p4d_t *vmemmap_p4d_populate(pgd_t *pgd, unsigned long addr, int node);
@@ -2436,10 +2438,6 @@ void *vmemmap_alloc_block(unsigned long size, int node);
 struct vmem_altmap;
 void *__vmemmap_alloc_block_buf(unsigned long size, int node,
 		struct vmem_altmap *altmap);
-static inline void *vmemmap_alloc_block_buf(unsigned long size, int node)
-{
-	return __vmemmap_alloc_block_buf(size, node, NULL);
-}
 
 #ifdef CONFIG_ZONE_DEVICE
 struct vmem_altmap *to_vmem_altmap(unsigned long memmap_start);

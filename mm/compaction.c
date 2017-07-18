@@ -741,6 +741,9 @@ isolate_migratepages_block(struct compact_control *cc, unsigned long low_pfn,
 
 		page = pfn_to_page(low_pfn);
 
+		if (PageVmemmap(page))
+			goto isolate_fail;
+
 		if (!valid_page)
 			valid_page = page;
 

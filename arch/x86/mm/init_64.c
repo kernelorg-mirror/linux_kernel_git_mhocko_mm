@@ -803,6 +803,15 @@ static void __meminit free_pagetable(struct page *page, int order)
 		return;
 	}
 
+	/*
+	 * runtime vmemmap pages are residing inside the memory section so
+	 * they do not have to be freed anywhere.
+	 */
+	if (PageVmemmap(page)) {
+		__ClearPageVmemmap(page);
+		return;
+	}
+
 	/* bootmem page has reserved flag */
 	if (PageReserved(page)) {
 		__ClearPageReserved(page);

@@ -14,6 +14,8 @@ struct device;
  * @free: free pages set aside in the mapping for memmap storage
  * @align: pages reserved to meet allocation alignments
  * @alloc: track pages consumed, private to __vmemmap_populate()
+ * @flush_alloc_pfns: callback to be called on the allocated range after it
+ *  is mapped to the vmemmap - see mark_vmemmap_pages
  */
 struct vmem_altmap {
 	const unsigned long base_pfn;
@@ -21,11 +23,32 @@ struct vmem_altmap {
 	unsigned long free;
 	unsigned long align;
 	unsigned long alloc;
+	void (*flush_alloc_pfns)(struct vmem_altmap *self);
 };
 
-unsigned long vmem_altmap_offset(struct vmem_altmap *altmap);
+static inline unsigned long vmem_altmap_offset(struct vmem_altmap *altmap)
+{
+	/* number of pfns from base where pfn_to_page() is valid */
+	return altmap->reserve + altmap->free;
+}
 void vmem_altmap_free(struct vmem_altmap *altmap, unsigned long nr_pfns);
 
+static inline void mark_vmemmap_pages(struct vmem_altmap *self)
+{
+	unsigned long pfn = self->base_pfn + self->reserve;
+	unsigned long nr_pages = self->alloc;
+	unsigned long i;
+
+	/*
+	 * All allocations for the memory hotplug are the same sized so align
+	 * should be 0
+	 */
+	WARN_ON(self->align);
+	for (i = 0; i < nr_pages; i++, pfn++) {
+		struct page *page = pfn_to_page(pfn);
+		__SetPageVmemmap(page);
+	}
+}
 /**
  * struct dev_pagemap - metadata for ZONE_DEVICE mappings
  * @altmap: pre-allocated/reserved memory for vmemmap allocations

@@ -35,6 +35,7 @@
 #include <linux/memblock.h>
 #include <linux/bootmem.h>
 #include <linux/compaction.h>
+#include <linux/memremap.h>
 
 #include <asm/tlbflush.h>
 
@@ -244,7 +245,7 @@ void __init register_page_bootmem_info_node(struct pglist_data *pgdat)
 #endif /* CONFIG_HAVE_BOOTMEM_INFO_NODE */
 
 static int __meminit __add_section(int nid, unsigned long phys_start_pfn,
-		bool want_memblock)
+		bool want_memblock, struct vmem_altmap *altmap)
 {
 	int ret;
 	int i;
@@ -252,7 +253,7 @@ static int __meminit __add_section(int nid, unsigned long phys_start_pfn,
 	if (pfn_valid(phys_start_pfn))
 		return -EEXIST;
 
-	ret = sparse_add_one_section(NODE_DATA(nid), phys_start_pfn);
+	ret = sparse_add_one_section(NODE_DATA(nid), phys_start_pfn, altmap);
 	if (ret < 0)
 		return ret;
 
@@ -292,12 +293,23 @@ int __ref __add_pages(int nid, unsigned long phys_start_pfn,
 	int err = 0;
 	int start_sec, end_sec;
 	struct vmem_altmap *altmap;
+	struct vmem_altmap __section_altmap = {.base_pfn = phys_start_pfn};
 
 	/* during initialize mem_map, align hot-added range to section */
 	start_sec = pfn_to_section_nr(phys_start_pfn);
 	end_sec = pfn_to_section_nr(phys_start_pfn + nr_pages - 1);
 
+	/*
+	 * Check device specific altmap and fallback to allocating from the
+	 * begining of the section otherwise
+	 */
 	altmap = to_vmem_altmap((unsigned long) pfn_to_page(phys_start_pfn));
+	if (!altmap) {
+		__section_altmap.free = nr_pages;
+		__section_altmap.flush_alloc_pfns = mark_vmemmap_pages;
+		altmap = &__section_altmap;
+	}
+
 	if (altmap) {
 		/*
 		 * Validate altmap is within bounds of the total request
@@ -312,7 +324,7 @@ int __ref __add_pages(int nid, unsigned long phys_start_pfn,
 	}
 
 	for (i = start_sec; i <= end_sec; i++) {
-		err = __add_section(nid, section_nr_to_pfn(i), want_memblock);
+		err = __add_section(nid, section_nr_to_pfn(i), want_memblock, altmap);
 
 		/*
 		 * EEXIST is finally dealt with by ioresource collision
@@ -689,6 +701,8 @@ static int online_pages_range(unsigned long start_pfn, unsigned long nr_pages,
 	if (PageReserved(pfn_to_page(start_pfn)))
 		for (i = 0; i < nr_pages; i++) {
 			page = pfn_to_page(start_pfn + i);
+			if (PageVmemmap(page))
+				continue;
 			if (PageHWPoison(page)) {
 				ClearPageReserved(page);
 				continue;
@@ -1405,6 +1419,9 @@ do_migrate_range(unsigned long start_pfn, unsigned long end_pfn)
 		if (!pfn_valid(pfn))
 			continue;
 		page = pfn_to_page(pfn);
+
+		if (PageVmemmap(page))
+			continue;
 
 		if (PageHuge(page)) {
 			struct page *head = compound_head(page);

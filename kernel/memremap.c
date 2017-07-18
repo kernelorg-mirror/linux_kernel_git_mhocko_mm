@@ -393,12 +393,6 @@ void *devm_memremap_pages(struct device *dev, struct resource *res,
 }
 EXPORT_SYMBOL(devm_memremap_pages);
 
-unsigned long vmem_altmap_offset(struct vmem_altmap *altmap)
-{
-	/* number of pfns from base where pfn_to_page() is valid */
-	return altmap->reserve + altmap->free;
-}
-
 void vmem_altmap_free(struct vmem_altmap *altmap, unsigned long nr_pfns)
 {
 	altmap->alloc -= nr_pfns;

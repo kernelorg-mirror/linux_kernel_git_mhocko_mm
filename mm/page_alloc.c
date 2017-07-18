@@ -1168,6 +1168,10 @@ static void free_one_page(struct zone *zone,
 static void __meminit __init_single_page(struct page *page, unsigned long pfn,
 				unsigned long zone, int nid)
 {
+	/*
+	 * Please note that the page already has some state which has to be
+	 * preserved (e.g. PageVmemmap)
+	 */
 	set_page_links(page, zone, nid, pfn);
 	init_page_count(page);
 	page_mapcount_reset(page);
@@ -7781,6 +7785,16 @@ __offline_isolated_pages(unsigned long start_pfn, unsigned long end_pfn)
 			continue;
 		}
 		page = pfn_to_page(pfn);
+
+		/*
+		 * vmemmap pages are residing inside the memory section so
+		 * they do not have to be freed anywhere.
+		 */
+		if (PageVmemmap(page)) {
+			pfn++;
+			continue;
+		}
+
 		/*
 		 * The HWPoisoned page may be not in buddy system, and
 		 * page_count() is not 0.

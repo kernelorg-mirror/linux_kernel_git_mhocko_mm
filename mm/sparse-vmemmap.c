@@ -264,7 +264,8 @@ int __meminit vmemmap_populate_basepages(unsigned long start,
 	return 0;
 }
 
-struct page * __meminit sparse_mem_map_populate(unsigned long pnum, int nid)
+struct page * __meminit __sparse_mem_map_populate(unsigned long pnum, int nid,
+		struct vmem_altmap *altmap)
 {
 	unsigned long start;
 	unsigned long end;
@@ -274,10 +275,16 @@ struct page * __meminit sparse_mem_map_populate(unsigned long pnum, int nid)
 	start = (unsigned long)map;
 	end = (unsigned long)(map + PAGES_PER_SECTION);
 
-	if (vmemmap_populate(start, end, nid))
+	if (__vmemmap_populate(start, end, nid, altmap))
 		return NULL;
 
 	return map;
+}
+
+struct page * __meminit sparse_mem_map_populate(unsigned long pnum, int nid)
+{
+	WARN_ON(to_vmem_altmap(pnum));
+	return __sparse_mem_map_populate(pnum, nid, NULL);
 }
 
 void __init sparse_mem_maps_populate_node(struct page **map_map,

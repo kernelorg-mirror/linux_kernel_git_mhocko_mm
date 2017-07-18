@@ -242,6 +242,10 @@ __test_page_isolated_in_pageblock(unsigned long pfn, unsigned long end_pfn,
 			continue;
 		}
 		page = pfn_to_page(pfn);
+		if (PageVmemmap(page)) {
+			pfn++;
+			continue;
+		}
 		if (PageBuddy(page))
 			/*
 			 * If the page is on a free list, it has to be on
@@ -272,10 +276,15 @@ int test_pages_isolated(unsigned long start_pfn, unsigned long end_pfn,
 	 * are not aligned to pageblock_nr_pages.
 	 * Then we just check migratetype first.
 	 */
-	for (pfn = start_pfn; pfn < end_pfn; pfn += pageblock_nr_pages) {
+	for (pfn = start_pfn; pfn < end_pfn; ) {
 		page = __first_valid_page(pfn, pageblock_nr_pages);
+		if (PageVmemmap(page)) {
+			pfn++;
+			continue;
+		}
 		if (page && !is_migrate_isolate_page(page))
 			break;
+		pfn += pageblock_nr_pages;
 	}
 	page = __first_valid_page(start_pfn, end_pfn - start_pfn);
 	if ((pfn < end_pfn) || !page)

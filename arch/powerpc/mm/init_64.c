@@ -264,6 +264,11 @@ void __ref vmemmap_free(unsigned long start, unsigned long end)
 				goto unmap;
 			}
 
+			if (PageVmemmap(page)) {
+				__ClearPageVmemmap(page);
+				goto unmap;
+			}
+
 			if (PageReserved(page)) {
 				/* allocated from bootmem */
 				if (page_size < PAGE_SIZE) {

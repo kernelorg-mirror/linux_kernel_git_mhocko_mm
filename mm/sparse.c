@@ -10,6 +10,7 @@
 #include <linux/export.h>
 #include <linux/spinlock.h>
 #include <linux/vmalloc.h>
+#include <linux/memremap.h>
 
 #include "internal.h"
 #include <asm/dma.h>
@@ -666,10 +667,11 @@ void offline_mem_sections(unsigned long start_pfn, unsigned long end_pfn)
 #endif
 
 #ifdef CONFIG_SPARSEMEM_VMEMMAP
-static inline struct page *kmalloc_section_memmap(unsigned long pnum, int nid)
+static inline struct page *kmalloc_section_memmap(unsigned long pnum, int nid,
+		struct vmem_altmap *altmap)
 {
 	/* This will make the necessary allocations eventually. */
-	return sparse_mem_map_populate(pnum, nid);
+	return __sparse_mem_map_populate(pnum, nid, altmap);
 }
 static void __kfree_section_memmap(struct page *memmap)
 {
@@ -709,7 +711,8 @@ got_map_ptr:
 	return ret;
 }
 
-static inline struct page *kmalloc_section_memmap(unsigned long pnum, int nid)
+static inline struct page *kmalloc_section_memmap(unsigned long pnum, int nid,
+		struct vmem_altmap *altmap)
 {
 	return __kmalloc_section_memmap();
 }
@@ -761,7 +764,8 @@ static void free_map_bootmem(struct page *memmap)
  * set.  If this is <=0, then that means that the passed-in
  * map was not consumed and must be freed.
  */
-int __meminit sparse_add_one_section(struct pglist_data *pgdat, unsigned long start_pfn)
+int __meminit sparse_add_one_section(struct pglist_data *pgdat, unsigned long start_pfn,
+		struct vmem_altmap *altmap)
 {
 	unsigned long section_nr = pfn_to_section_nr(start_pfn);
 	struct mem_section *ms;
@@ -777,7 +781,7 @@ int __meminit sparse_add_one_section(struct pglist_data *pgdat, unsigned long st
 	ret = sparse_index_init(section_nr, pgdat->node_id);
 	if (ret < 0 && ret != -EEXIST)
 		return ret;
-	memmap = kmalloc_section_memmap(section_nr, pgdat->node_id);
+	memmap = kmalloc_section_memmap(section_nr, pgdat->node_id, altmap);
 	if (!memmap)
 		return -ENOMEM;
 	usemap = __kmalloc_section_usemap();
@@ -794,7 +798,19 @@ int __meminit sparse_add_one_section(struct pglist_data *pgdat, unsigned long st
 		goto out;
 	}
 
+	/*
+	 * TODO get rid of this somehow - we want to postpone the full
+	 * initialization until memmap_init_zone.
+	 */
 	memset(memmap, 0, sizeof(struct page) * PAGES_PER_SECTION);
+
+	/*
+	 * now that we have a valid vmemmap mapping we can use
+	 * pfn_to_page and flush struct pages which back the
+	 * memmap
+	 */
+	if (altmap && altmap->flush_alloc_pfns)
+		altmap->flush_alloc_pfns(altmap);
 
 	section_mark_present(ms);
 
