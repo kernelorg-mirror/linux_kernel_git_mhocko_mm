@@ -2456,8 +2456,12 @@ int __vmemmap_populate(unsigned long start, unsigned long end, int node,
 static inline int vmemmap_populate(unsigned long start, unsigned long end,
 		int node)
 {
-	struct vmem_altmap *altmap = to_vmem_altmap(start);
-	return __vmemmap_populate(start, end, node, altmap);
+	/*
+	 * All users of the altmap have to be explicit and use
+	 * __vmemmap_populate directly
+	 */
+	WARN_ON(to_vmem_altmap(start));
+	return __vmemmap_populate(start, end, node, NULL);
 }
 
 void vmemmap_populate_print_last(void);
